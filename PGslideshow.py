@@ -8,26 +8,6 @@ import sys
 import array
 import datetime
 
-#
-# ToDo:
-#       write config/state file & check for changes on startup
-#       (could assist with portability...)
-#
-#       Determine resolution numbers dynamically cf. pygame.display.info
-#
-#
-#       Enumerate subdirectories. Cycle through them from the Menu screen.
-#
-#       Navigate thumbnail view with cursor keys. Draw a cursor under the selected image.
-#       1 - Winner / 2 - Runner-up / etc; copy file to Results subdirectory with suitable filename
-#
-#       Use a list of file hashes to look up the submitters?
-#
-#       Could even add an 'add entry' menu item to browse jpgs and copy to
-#       the appropriate directory, entering entrant name at the same time.
-#
-#       12) Finish scoping the project :-)
-#
 
 def displayimage(imagefile,imagenum,timevar):
     isurf = pygame.image.load(imagefile)
