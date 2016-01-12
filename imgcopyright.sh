@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# imgcopyright -
+# imgcopyright.sh - watermark images with a (c) notice
 #
 
 # Requires ImageMagick convert & composite
@@ -22,8 +22,8 @@ composite -gravity SouthEast -dissolve 40% /tmp/WATERMARK_FILE.png "$ORIGFILE" "
 
 USAGE=0
 OWNER="$1"
-FILE1="$2"
-FILE2="$3"
+FILE1="$(cygpath "$2")"
+FILE2="$(cygpath "$3")"
 
 if [ "X$OWNER" = "X" ]; then
   printf "No arguments!\n"
