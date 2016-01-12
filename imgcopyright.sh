@@ -14,8 +14,14 @@
 #
 
 watermark() { WMTEXT="$1"; ORIGFILE="$2"; NEWFILE="$3"
-#convert -size 1200x200 xc:none -font /cygdrive/c/Windows/Fonts/arial.ttf -pointsize 72 -kerning 1 -gravity Center -fill black -fill white -annotate 0 "$WMTEXT" -auto-orient /tmp/WATERMARK_FILE.png
+#Worked for 24-char name on a 2000x1333 image:
+#convert -size 1400x200 xc:none -font /cygdrive/c/Windows/Fonts/arial.ttf -pointsize 96 -kerning 1 -gravity Center -fill black -fill white -annotate 0 "$WMTEXT" -auto-orient /tmp/WATERMARK_FILE.png
+
+#Default (good for 11-char name on 900x1200 image):
 convert -size 600x200 xc:none -font /cygdrive/c/Windows/Fonts/arial.ttf -pointsize 72 -kerning 1 -gravity Center -fill black -fill white -annotate 0 "$WMTEXT" -auto-orient /tmp/WATERMARK_FILE.png
+
+#Worked for 15-char name on a 480x640 image:
+#convert -size 450x150 xc:none -font /cygdrive/c/Windows/Fonts/arial.ttf -pointsize 48 -kerning 1 -gravity Center -fill black -fill white -annotate 0 "$WMTEXT" -auto-orient /tmp/WATERMARK_FILE.png
 
 composite -gravity SouthEast -dissolve 40% /tmp/WATERMARK_FILE.png "$ORIGFILE" "$NEWFILE"
 }
