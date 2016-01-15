@@ -12,7 +12,7 @@
 #
 #       Navigate thumbnail view with cursor keys. Draw a cursor under the selected image.
 #       1 - Winner / 2 - Runner-up / etc; copy file to Results subdirectory with suitable filename
-#        option: Results subdir or myname_results at the same level
+#        option: Results subdir or myname_results * better still: zzResults_myname * at the same level
 #
 #       Use a list of file hashes to look up the submitters?
 #
