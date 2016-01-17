@@ -1,4 +1,3 @@
 @echo off
-C:\Users\al\Dropbox\software\NUPGslideshow.py C:\Users\al\Dropbox\software\NUPGslideshow.png %1 
-
-pause
+C:\Dropbox\software\PGslideshow.py C:\Dropbox\software\PGslideshow.png %1 
+if ERRORLEVEL 1 pause

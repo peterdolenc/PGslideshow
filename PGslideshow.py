@@ -39,22 +39,21 @@ def showimage(imagefile):
     irect = isurf.get_rect()
     imgwidth = isurf.get_width()
     imgheight = isurf.get_height()
-#    print (imgwidth,imgheight,screenwidth,screenheight)
     if screenwidth > imgwidth:
         irect.move_ip(int((screenwidth-imgwidth)/2),0)
     if screenheight > imgheight:
         irect.move_ip(0,int((screenheight-imgheight)/2))
 #    screen.fill(pygame.Color('#00000000'))
-#    screen.blit(isurf,irect,area=None, special_flags = 0)
-#    pygame.display.flip()
-    for x in range(8):
-        y = 2**x
-        y = y - 1
-#        print(y)
-        isurf.set_alpha(y)
-        screen.fill(pygame.Color(0,0,0))
-        screen.blit(isurf,irect)
-        pygame.display.update()
+    screen.blit(isurf,irect,area=None, special_flags = 0)
+    pygame.display.flip()
+#    for x in range(8):
+#        y = 2**x
+#        y = y - 1
+##        print(y)
+#        isurf.set_alpha(y)
+#        screen.fill(pygame.Color(0,0,0))
+#        screen.blit(isurf,irect)
+#        pygame.display.update()
 
 
 
@@ -131,6 +130,35 @@ def display_thumbs(THUMBS_DONE):
     screen.blit(tsurf,(0,0),area=None, special_flags = 0)
     pygame.display.update()
     
+def showimages():
+    imgcntr = 0
+    while True:
+        screen.fill(pygame.Color('#00000000'))
+        isurf = pygame.image.load(jpgfiles[imgcntr])
+        isurf = aspect_scale(isurf, screen)
+        irect = isurf.get_rect()
+        imgwidth = isurf.get_width()
+        imgheight = isurf.get_height()
+        if screenwidth > imgwidth:
+            irect.move_ip(int((screenwidth-imgwidth)/2),0)
+        if screenheight > imgheight:
+            irect.move_ip(0,int((screenheight-imgheight)/2))
+        screen.blit(isurf,irect,area=None, special_flags = 0)
+        pygame.display.update()
+        event = pygame.event.wait()
+        if event.type == KEYDOWN:
+            if event.key in (K_q, K_m):
+                break
+            elif event.key in (K_SPACE, K_RIGHT):
+                imgcntr += 1
+            elif event.key == K_LEFT:
+                imgcntr -= 1
+            if imgcntr >= numfiles:
+                imgcntr = numfiles - 1
+            if imgcntr < 1:
+                imgcntr = 0
+
+
 def display_menu(logofile):
     menufont=pygame.freetype.SysFont('Consolas',14)
     lsurf = screen.copy()
@@ -153,39 +181,61 @@ def display_menu(logofile):
     menuitem = menu_text('Directory: ' + imagedir,menuitem+1)
     pygame.display.flip()
 
+def initialise_thumbs(numthumbs):
+    #
+    # Setup the thumbnail geometry. Squares will
+    # do - this only sacrifices symmetry, not size
+    #
+    gridsize = 0
+    square = 0
+    while square < numthumbs:
+        gridsize += 1
+        square = gridsize ** 2
+    thumbx = array.array('i',(0,) * square)
+    thumby = array.array('i',(0,) * square)
+    thumbwidth = int((screenwidth - (gridsize * 20)) / gridsize)
+    thumbheight = int((screenheight - (gridsize * 20)) / gridsize)
+    xcount = gridsize
+    ycount = gridsize
+    imgcntr = 0
+    for ty in range(ycount):
+        for tx in range(xcount):
+            thumbx[imgcntr]=int(10 + ((tx) * (thumbwidth + 20)))
+            thumby[imgcntr]=int(10 + ((ty) * (thumbheight + 20)))
+            imgcntr += 1
+    return (thumbwidth, thumbheight, thumbx, thumby)
+
 ##
 ## Main block starts here
 ##
 
 logofile = sys.argv[1]
-imagedir = sys.argv[2]
+startdir = sys.argv[2]
 TIME_DILATION=150
+
+#
+# Enumerate dirs and jpg files.
+# Assume the filenames already have randomised prefixes for now
+#
+dirlist=find_dirs(startdir)
+if len(dirlist) == 0:
+    imagedir = startdir
+else:
+    imagedir = dirlist[0]
+jpgfiles = find_files(imagedir, ".jpg")
+numfiles = len(jpgfiles)
 
 #
 # Initialisation
 #
+PGdebug = 0
 THUMBS_DONE = 0
 pygame.init()
 pygame.mouse.set_visible(False)
 
-#print (pygame.display.list_modes())
-#HPLaptop:
-#screenwidth,screenheight=(1920,1080)
-#Ultrabook+Projector:
-#screenwidth,screenheight=(1600,900)
-#screen = pygame.display.set_mode((screenwidth,screenheight),pygame.FULLSCREEN)
-
 screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
 screen.fill(pygame.Color(0,0,0))
 (screenwidth,screenheight) = pygame.Surface.get_size(screen)
-
-#import ctypes
-#user32=ctypes.windll.user32
-#screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-#print(screensize)
-import tkinter
-root=tkinter.Tk()
-root.tk.call('tk', 'scaling', 1.0)
 
 myfont = pygame.freetype.SysFont('Arial',240)
 imagenumpos = (screenwidth-250,20)
@@ -198,42 +248,16 @@ display_menu(logofile)
 #
 tsurf = screen.copy()
 tsurf.fill(pygame.Color('#00000000'))
-#
-# Enumerate jpg files. Assume the filenames already have randomised prefixes
-#
-jpgfiles = find_files(imagedir, ".jpg")
-numfiles = len(jpgfiles)
+(thumbwidth, thumbheight, thumbx, thumby) = initialise_thumbs(numfiles)
 
-#
-# Setup the thumbnail geometry. Squares will do - this only sacrifices symmetry, not size
-#
-gridsize = 0
-square = 0
-while square < numfiles:
-    gridsize += 1
-    square = gridsize ** 2
-thumbx = array.array('i',(0,) * square)
-thumby = array.array('i',(0,) * square)
-thumbwidth = int((screenwidth - (gridsize * 20)) / gridsize)
-thumbheight = int((screenheight - (gridsize * 20)) / gridsize)
-xcount = gridsize
-ycount = gridsize
-imgcntr = 0
-for ty in range(ycount):
-    for tx in range(xcount):
-        thumbx[imgcntr]=int(10 + ((tx) * (thumbwidth + 20)))
-        thumby[imgcntr]=int(10 + ((ty) * (thumbheight + 20)))
-        #print(imgcntr,tx,ty,thumbx[imgcntr],thumby[imgcntr])
-        imgcntr += 1
 #
 # Event handling loop
 #
-running = True
-while running == True:
+while True:
     event = pygame.event.wait()
     if event.type == KEYDOWN:
         if event.key == K_q:
-            running = False
+            break
         elif event.key == K_t:
             screen.blit(tsurf,tsurf.get_rect(),area=None, special_flags = 0)
             display_thumbs(THUMBS_DONE)
@@ -241,27 +265,7 @@ while running == True:
             screen.fill(pygame.Color('#00000000'))
             display_menu(logofile)
         elif event.key == K_n:
-            screen.fill(pygame.Color('#00000000'))
-            imgcntr = 0
-            showing = True
-            while showing == True:
-                showimage(jpgfiles[imgcntr])
-                event = pygame.event.wait()
-                if event.type == KEYDOWN:
-                    if event.key == K_q:
-                        showing = False
-                    elif event.key == K_m:
-                        showing = False
-                    elif event.key == K_SPACE:
-                        imgcntr += 1
-                    elif event.key == K_LEFT:
-                        imgcntr -= 1
-                    elif event.key == K_RIGHT:
-                        imgcntr += 1
-                if imgcntr >= numfiles:
-                    imgcntr = numfiles - 1
-                if imgcntr < 1:
-                    imgcntr = 0
+            showimages()
             screen.fill(pygame.Color('#00000000'))
             display_menu(logofile)
         elif event.key == K_f:
@@ -289,4 +293,4 @@ while running == True:
 # Exit
 #
 pygame.quit()
-#sys.exit()
+sys.exit(PGdebug)
