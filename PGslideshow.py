@@ -208,9 +208,21 @@ def initialise_thumbs(numthumbs):
 ##
 ## Main block starts here
 ##
+if len(sys.argv) > 3:
+    otherstuff=list("")
+    (myname, logofile, startdir, otherstuff) = sys.argv
+    PGdebug=1
+    print("Extra args received: " + otherstuff + "\n")
+    print("\nDebugging ON\n")
+elif len(sys.argv) < 3:
+    print("Not enough args! - received:\n")
+    for arg in sys.argv:
+         print("\t" + arg + "\n")
+    sys.exit(1)
+else:
+    (myname, logofile, startdir) = sys.argv
+    PGdebug=0
 
-logofile = sys.argv[1]
-startdir = sys.argv[2]
 TIME_DILATION=150
 
 #
@@ -228,7 +240,6 @@ numfiles = len(jpgfiles)
 #
 # Initialisation
 #
-PGdebug = 0
 THUMBS_DONE = 0
 pygame.init()
 pygame.mouse.set_visible(False)
@@ -237,8 +248,14 @@ screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
 screen.fill(pygame.Color(0,0,0))
 (screenwidth,screenheight) = pygame.Surface.get_size(screen)
 
-myfont = pygame.freetype.SysFont('Arial',240)
-imagenumpos = (screenwidth-250,20)
+# Now scaling img numbers with the display size
+#myfont = pygame.freetype.SysFont('Arial',240)
+#imagenumpos = (screenwidth-250,20)
+imagenumsiz = int(screenheight / 5)
+myfont = pygame.freetype.SysFont('Arial',imagenumsiz)
+imagenumpos = (screenwidth-int(imagenumsiz * 1.1),20)
+
+
 #
 # Display logo / menu
 #
@@ -294,3 +311,4 @@ while True:
 #
 pygame.quit()
 sys.exit(PGdebug)
+
