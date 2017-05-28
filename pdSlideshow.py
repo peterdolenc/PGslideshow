@@ -2,8 +2,6 @@
 """
 A pygame program to show a slideshow of all images buried in a given directory.
 
-Originally Released: 2007.10.31 (Happy halloween!)
-
 # TODO:
 - ken burns
 - dont scroll if not neccessary
@@ -41,7 +39,7 @@ def walktree(top, callback):
             callback(pathname)
         else:
             # Unknown file type, print a message
-            print 'Skipping %s' % pathname
+            print('Skipping %s' % pathname)
 
 
 def addtolist(file, extensions=['.png', '.jpg', '.jpeg', '.gif', '.bmp']):
@@ -51,10 +49,10 @@ def addtolist(file, extensions=['.png', '.jpg', '.jpeg', '.gif', '.bmp']):
     e = ext.lower()
     # Only add common image types to the list.
     if e in extensions:
-        print 'Adding to list: ', file
+        print('Adding to list: ', file)
         file_list.append(file)
     else:
-        print 'Skipping: ', file, ' (NOT a supported image)'
+        print('Skipping: ', file, ' (NOT a supported image)')
 
 
 
@@ -74,8 +72,8 @@ def main(startdir="."):
 
     # Test for image support
     if not pygame.image.get_extended():
-        print "Your Pygame isn't built with extended image support."
-        print "It's likely this isn't going to work."
+        print("Your Pygame isn't built with extended image support.")
+        print("It's likely this isn't going to work.")
         sys.exit(1)
 
     modes = pygame.display.list_modes()
@@ -96,7 +94,7 @@ def read_files_and_present(startdir, screen, waittime):
     
     walktree(startdir, addtolist)  # this may take a while...
     if len(file_list) == 0:
-        print "Sorry. No images found. Exiting."
+        print("Sorry. No images found. Exiting.")
         sys.exit(1)
 
     modes = pygame.display.list_modes()    
@@ -106,7 +104,7 @@ def read_files_and_present(startdir, screen, waittime):
 
     # sort files by filename
     file_list = sorted(file_list)
-    # shuffle the images in clusters
+    # shuffle the images in clusters so that you see images in random order, but always see a few images from same event
     clustered_shuffled_list = []
     cluster_sizes = 8
     c = 0
@@ -184,7 +182,7 @@ def display_image(imagefile, screen, display_mode, waittime):
         input(pygame.event.get())
         #sys.exit(1)
     except pygame.error as err:
-        print "Failed to display %s: %s" % (file_list[current], err)
+        print("Failed to display %s: %s" % (file_list[current], err))
 
 def average(lst):
     return sum(lst)/len(lst)
@@ -245,7 +243,7 @@ def pan_image_vertically(img, screen, display_mode, scroll_steps, offset, waitti
     
     reverse = random.random() > 0.5    
     
-    for i in range(scroll_steps):
+    for i in range(int(scroll_steps)):
         ts = milli_time()
         if (reverse):
             screen.blit(img, (offset, 0- overlap_distance + int(i*overlap_distance_factor)))
@@ -256,6 +254,7 @@ def pan_image_vertically(img, screen, display_mode, scroll_steps, offset, waitti
         input(pygame.event.get())
         te = milli_time()
 
+        input(pygame.event.get())
         delay_if_neccessary(te-ts, wait_per_step)
         
     
@@ -282,6 +281,7 @@ def pan_image_horizontally(img, screen, display_mode, scroll_steps, offset, wait
         input(pygame.event.get())
         te = milli_time()
         
+        input(pygame.event.get())
         delay_if_neccessary(te-ts, wait_per_step)
 
         
