@@ -1,314 +1,322 @@
-from distutils.core import setup
-import pygame
-import pygame.freetype
-from pygame.locals import *
-from pygame import K_q, K_f, K_t, K_s, K_w, K_m, K_n, K_SPACE, K_LEFT, K_RIGHT
+#!/usr/bin/env python
+"""
+A pygame program to show a slideshow of all images buried in a given directory.
+
+Originally Released: 2007.10.31 (Happy halloween!)
+
+# TODO:
+- ken burns
+- dont scroll if not neccessary
+
+
+"""
+import argparse
 import os
+import stat
 import sys
-import array
-import datetime
+import time
+import random
+
+import pygame
+from pygame.locals import QUIT, KEYDOWN, K_ESCAPE
+
+file_list = []  # a list of all images being shown
+title = "pgSlideShow | My Slideshow!"  # caption of the window...
+waittime = 1   # default time to wait between images (in seconds)
 
 
-def displayimage(imagefile,imagenum,timevar):
-    isurf = pygame.image.load(imagefile)
-    isurf = aspect_scale(isurf, screen)
-    irect = isurf.get_rect()
-    imgwidth = isurf.get_width()
-    imgheight = isurf.get_height()
-    if screenwidth > imgwidth:
-        irect.move_ip(int((screenwidth-imgwidth)/2),0)
-    if screenheight > imgheight:
-        irect.move_ip(0,int((screenheight-imgheight)/2))
-    screen.blit(isurf,irect,area=None, special_flags = 0)
-    pygame.display.flip()
-    pygame.time.wait(30 * timevar)
-
-    myfont.render_to(screen,imagenumpos,"{:0>2d}".format(imagenum+1),pygame.Color('#B0B0B0FF'))
-    pygame.display.flip()
-    pygame.time.wait(20 * timevar)
-
-    if THUMBS_DONE == 0:
-        ithumb = pygame.transform.scale(screen, (thumbwidth,thumbheight))
-        blitresult=tsurf.blit(ithumb,(thumbx[imagenum],thumby[imagenum]))
-    screen.fill(pygame.Color('#00000000'))
-    pygame.display.flip()
-
-def showimage(imagefile):
-    isurf = pygame.image.load(imagefile)
-    isurf = aspect_scale(isurf, screen)
-    irect = isurf.get_rect()
-    imgwidth = isurf.get_width()
-    imgheight = isurf.get_height()
-    if screenwidth > imgwidth:
-        irect.move_ip(int((screenwidth-imgwidth)/2),0)
-    if screenheight > imgheight:
-        irect.move_ip(0,int((screenheight-imgheight)/2))
-#    screen.fill(pygame.Color('#00000000'))
-    screen.blit(isurf,irect,area=None, special_flags = 0)
-    pygame.display.flip()
-#    for x in range(8):
-#        y = 2**x
-#        y = y - 1
-##        print(y)
-#        isurf.set_alpha(y)
-#        screen.fill(pygame.Color(0,0,0))
-#        screen.blit(isurf,irect)
-#        pygame.display.update()
-
-
-
-## Found at https://www.raspberrypi.org/forums/viewtopic.php?f=32&t=80229&p=571235
-## - might be useful:
-def image_fade(self, image_name):
-    background = pygame.image.load(name)
-    background = pygame.transform.scale(background,(imgsize[0],imgsize[1])).convert()
-
-    for x in range(0,255):
-        background.set_alpha(x)
-        screen.fill(pygame.Color(0,0,0))
-        screen.blit(background, (0, 0))
-        pygame.display.update()
-        x += 1
-##
-##
-
-## Derived from fn at http://www.pygame.org/pcr/transform_scale/
-## Takes two surfaces - fit img into disp
-def aspect_scale(img, disp):
-    bx=disp.get_width()
-    by=disp.get_height()
-    ix,iy = img.get_size()
-    if ix > iy:
-        # fit to width
-        scale_factor = bx/float(ix)
-        sy = scale_factor * iy
-        if sy > by:
-            scale_factor = by/float(iy)
-            sx = scale_factor * ix
-            sy = by
+def walktree(top, callback):
+    """recursively descend the directory tree rooted at top, calling the
+    callback function for each regular file. Taken from the module-stat
+    example at: http://docs.python.org/lib/module-stat.html
+    """
+    for f in os.listdir(top):
+        pathname = os.path.join(top, f)
+        mode = os.stat(pathname)[stat.ST_MODE]
+        if stat.S_ISDIR(mode):
+            # It's a directory, recurse into it
+            walktree(pathname, callback)
+        elif stat.S_ISREG(mode):
+            # It's a file, call the callback function
+            callback(pathname)
         else:
-            sx = bx
+            # Unknown file type, print a message
+            print 'Skipping %s' % pathname
+
+
+def addtolist(file, extensions=['.png', '.jpg', '.jpeg', '.gif', '.bmp']):
+    """Add a file to a global list of image files."""
+    global file_list  # ugh
+    filename, ext = os.path.splitext(file)
+    e = ext.lower()
+    # Only add common image types to the list.
+    if e in extensions:
+        print 'Adding to list: ', file
+        file_list.append(file)
     else:
-        # fit to height
-        scale_factor = by/float(iy)
-        sx = scale_factor * ix
-        if sx > bx:
-            scale_factor = bx/float(ix)
-            sx = bx
-            sy = scale_factor * iy
-        else:
-            sy = by
-    return pygame.transform.scale(img, (int(sx),int(sy)))
-##
-##
+        print 'Skipping: ', file, ' (NOT a supported image)'
 
-def opj(*args):
-    path = os.path.join(*args)
-    return os.path.normpath(path)
 
-def find_files(srcdir, extn):
+
+def input(events):
+    """A function to handle keyboard/mouse/device input events. """
+    for event in events:  # Hit the ESC key to quit the slideshow.
+        if (event.type == QUIT or
+            (event.type == KEYDOWN and event.key == K_ESCAPE)):
+            pygame.quit()
+
+
+
+def main(startdir="."):
+    global file_list, title, waittime
+
+    pygame.init()
+
+    # Test for image support
+    if not pygame.image.get_extended():
+        print "Your Pygame isn't built with extended image support."
+        print "It's likely this isn't going to work."
+        sys.exit(1)
+
+    modes = pygame.display.list_modes()
+    pygame.display.set_mode(max(modes), pygame.DOUBLEBUF | pygame.HWSURFACE)
+    pygame.display.set_caption(title)
+    pygame.display.toggle_fullscreen()
+    screen = pygame.display.get_surface()
+    pygame.mouse.set_visible(False)
+
+    while (True):
+        read_files_and_present(startdir, screen, waittime)
+
+        
+
+def read_files_and_present(startdir, screen, waittime):
+    global file_list
     file_list = []
-    for file in sorted(os.listdir(srcdir)):
-        if file.endswith(extn):
-            file_list.append(opj(srcdir,file))
-    return file_list
-
-def find_dirs(srcdir):
-    dir_list = []
-    for file in sorted(os.listdir(srcdir)):
-        if os.path.isdir(opj(srcdir,file)):
-            dir_list.append(opj(srcdir,file))
-    return dir_list
-
-def display_thumbs(THUMBS_DONE):
-    if THUMBS_DONE == 0:
-        imgcntr = 0
-        for jpgfile in jpgfiles:
-            displayimage(jpgfile,imgcntr,0)
-            imgcntr += 1
-        THUMBS_DONE = 1
-    screen.blit(tsurf,(0,0),area=None, special_flags = 0)
-    pygame.display.update()
     
-def showimages():
-    imgcntr = 0
-    while True:
-        screen.fill(pygame.Color('#00000000'))
-        isurf = pygame.image.load(jpgfiles[imgcntr])
-        isurf = aspect_scale(isurf, screen)
-        irect = isurf.get_rect()
-        imgwidth = isurf.get_width()
-        imgheight = isurf.get_height()
-        if screenwidth > imgwidth:
-            irect.move_ip(int((screenwidth-imgwidth)/2),0)
-        if screenheight > imgheight:
-            irect.move_ip(0,int((screenheight-imgheight)/2))
-        screen.blit(isurf,irect,area=None, special_flags = 0)
+    walktree(startdir, addtolist)  # this may take a while...
+    if len(file_list) == 0:
+        print "Sorry. No images found. Exiting."
+        sys.exit(1)
+
+    modes = pygame.display.list_modes()    
+
+    current = 0
+    num_files = len(file_list)
+
+    # sort files by filename
+    file_list = sorted(file_list)
+    # shuffle the images in clusters
+    clustered_shuffled_list = []
+    cluster_sizes = 8
+    c = 0
+    cluster_a = []
+    cluster_b = []
+    for i in range(num_files):
+        if c == cluster_sizes:
+            clustered_shuffled_list.append(cluster_a)
+            clustered_shuffled_list.append(cluster_b)
+            cluster_a = []
+            cluster_b = []
+            c = 0
+
+        if random.random() > 0.5:
+            cluster_a.append(file_list[i])
+        else:
+            cluster_b.append(file_list[i])
+
+        c = c+1
+
+    clustered_shuffled_list.append(cluster_a)
+    clustered_shuffled_list.append(cluster_b)
+
+    random.shuffle(clustered_shuffled_list)
+
+    image_filelist = [image for cluster in clustered_shuffled_list for image in cluster]
+        
+    
+    for i in range(100):
+        imagefile = image_filelist[current]
+        display_image(imagefile, screen, max(modes), waittime)
+        pygame.mouse.set_pos(int(random.random()*1000), int(random.random()*1000))
+        
+        # When we get to the end, re-start at the beginning
+        current = (current + 1) % num_files;
+
+
+
+def display_image(imagefile, screen, display_mode, waittime):
+    try:
+        img = pygame.image.load(imagefile).convert(24)
+        scroll_steps = waittime/2
+
+        #obtain image properties
+        img_w = img.get_width()
+        img_h = img.get_height()
+        display_w = display_mode[0]
+        display_h = display_mode[1]
+
+        # calculate image ratio
+        img_r = float(img_w)/float(img_h)
+        display_r = float(display_w)/float(display_h)
+
+        smallest_w = min(img_w, display_w)
+        smallest_h = min(img_h, display_h)
+
+        offset = 0
+        
+        if img_r > display_r:
+            if (smallest_h < display_h):
+                dominant_color = get_dominant_color(img)
+                screen.fill(dominant_color)
+                offset = (display_h - smallest_h)/2
+            img = pygame.transform.smoothscale(img, (int(smallest_h*img_r), smallest_h))
+            
+            pan_image_horizontally(img, screen, display_mode, scroll_steps, offset, waittime)
+        else:
+            if (smallest_w < display_w):
+                dominant_color = get_dominant_color(img)
+                screen.fill(dominant_color)
+                offset = (display_w - smallest_w)/2
+            img = pygame.transform.smoothscale(img, (smallest_w, int(smallest_w/img_r)))
+            pan_image_vertically(img, screen, display_mode, scroll_steps, offset, waittime)      
+
+        input(pygame.event.get())
+        #sys.exit(1)
+    except pygame.error as err:
+        print "Failed to display %s: %s" % (file_list[current], err)
+
+def average(lst):
+    return sum(lst)/len(lst)
+
+def median(lst):
+    lst = sorted(lst)
+    return lst[len(lst)/2]
+
+def close_mean(lst):
+    divider = 5
+    lst = [int((i-1)/divider) for i in lst]
+    mc = most_common(lst)
+    return mc*divider + divider/2
+
+def most_common(lst):
+    return max(set(lst), key=lst.count)
+
+def get_dominant_color(img):
+    pixarray = pygame.PixelArray(img)
+    colors = []
+    maxcount = 0
+    maxcolor = 0
+    color_steps = 6
+    color_gap = int(256.0/float(color_steps) + 0.5)
+    
+    for i in range(pixarray.shape[0]):
+        if (i % 3 == 0):
+            for j in range(pixarray.shape[1]):
+                if (j % 3 == 0):
+                    #rgbc = pygame.Color(pixarray[i,j]*256 + 255)
+                    pixel = img.get_at((i,j))
+                    r = pixel[0]
+                    g = pixel[1]
+                    b = pixel[2]
+                    colorint = r/color_gap*color_steps*color_steps + g/color_gap*color_steps + b/color_gap
+                    colors.append(colorint)
+                    
+    fcolor = most_common(colors)
+
+    dominant_color = pygame.Color( ((fcolor/color_steps/color_steps)%color_steps)*color_gap+color_gap/2, ((fcolor/color_steps)%color_steps)*color_gap+color_gap/2, ((fcolor)%color_steps)*color_gap+color_gap/2, 255)
+
+    return dominant_color
+            
+def milli_time():
+    return int(round(time.time() * 1000))
+
+def delay_if_neccessary(elapsed, required):
+    if required > elapsed:
+        time.sleep(float(required - elapsed)/1000.0)
+
+def pan_image_vertically(img, screen, display_mode, scroll_steps, offset, waittime):
+    img_h = img.get_height()
+    display_h = display_mode[1]
+
+    overlap_distance = img_h - display_h
+    overlap_distance_factor = float(overlap_distance) / scroll_steps
+    wait_per_step = float(waittime)*1000.0/scroll_steps
+    
+    reverse = random.random() > 0.5    
+    
+    for i in range(scroll_steps):
+        ts = milli_time()
+        if (reverse):
+            screen.blit(img, (offset, 0- overlap_distance + int(i*overlap_distance_factor)))
+        else:
+            screen.blit(img, (offset, 0-int(i*overlap_distance_factor)))
+        input(pygame.event.get())
         pygame.display.update()
-        event = pygame.event.wait()
-        if event.type == KEYDOWN:
-            if event.key in (K_q, K_m):
-                break
-            elif event.key in (K_SPACE, K_RIGHT):
-                imgcntr += 1
-            elif event.key == K_LEFT:
-                imgcntr -= 1
-            if imgcntr >= numfiles:
-                imgcntr = numfiles - 1
-            if imgcntr < 1:
-                imgcntr = 0
+        input(pygame.event.get())
+        te = milli_time()
+
+        delay_if_neccessary(te-ts, wait_per_step)
+        
+    
 
 
-def display_menu(logofile):
-    menufont=pygame.freetype.SysFont('Consolas',14)
-    lsurf = screen.copy()
-    lsurf.fill(pygame.Color('#00000000'))
-    lsurf = pygame.image.load(logofile)
-    screen.blit(lsurf,(0,0),area=None, special_flags = 0)
-    def menu_text(menutext,menuitem):
-        menupos = (int(screenwidth/2)-100,int(screenheight/2)+(menuitem*20))
-        menufont.render_to(screen,menupos,menutext,pygame.Color('#B0B0B0FF'))
-        menuitem = menuitem + 1
-        return menuitem
-    menuitem = 0
-    menuitem = menu_text('t ... Thumbnails',menuitem)
-    menuitem = menu_text('s ... Slideshow (for voting)',menuitem)
-    menuitem = menu_text('n ... Normal Slideshow',menuitem)
-    menuitem = menu_text('w ... Write thumbnail image',menuitem)
-    menuitem = menu_text('f ... Write index file',menuitem)
-    menuitem = menu_text('m ... Return to this Menu',menuitem)
-    menuitem = menu_text('q ... Quit',menuitem)
-    menuitem = menu_text('Directory: ' + imagedir,menuitem+1)
-    pygame.display.flip()
+def pan_image_horizontally(img, screen, display_mode, scroll_steps, offset, waittime):
+    img_w = img.get_width()
+    display_w = display_mode[0]
 
-def initialise_thumbs(numthumbs):
-    #
-    # Setup the thumbnail geometry. Squares will
-    # do - this only sacrifices symmetry, not size
-    #
-    gridsize = 0
-    square = 0
-    while square < numthumbs:
-        gridsize += 1
-        square = gridsize ** 2
-    thumbx = array.array('i',(0,) * square)
-    thumby = array.array('i',(0,) * square)
-    thumbwidth = int((screenwidth - (gridsize * 20)) / gridsize)
-    thumbheight = int((screenheight - (gridsize * 20)) / gridsize)
-    xcount = gridsize
-    ycount = gridsize
-    imgcntr = 0
-    for ty in range(ycount):
-        for tx in range(xcount):
-            thumbx[imgcntr]=int(10 + ((tx) * (thumbwidth + 20)))
-            thumby[imgcntr]=int(10 + ((ty) * (thumbheight + 20)))
-            imgcntr += 1
-    return (thumbwidth, thumbheight, thumbx, thumby)
+    overlap_distance = img_w - display_w
+    overlap_distance_factor = overlap_distance / scroll_steps
+    wait_per_step = float(waittime)*1000.0/scroll_steps
 
-##
-## Main block starts here
-##
-if len(sys.argv) > 3:
-    otherstuff=list("")
-    (myname, logofile, startdir, otherstuff) = sys.argv
-    PGdebug=1
-    print("Extra args received: " + otherstuff + "\n")
-    print("\nDebugging ON\n")
-elif len(sys.argv) < 3:
-    print("Not enough args! - received:\n")
-    for arg in sys.argv:
-         print("\t" + arg + "\n")
-    sys.exit(1)
-else:
-    (myname, logofile, startdir) = sys.argv
-    PGdebug=0
+    reverse = random.random() > 0.5    
+    
+    for i in range(scroll_steps):
+        ts = milli_time()
+        if (reverse):
+            screen.blit(img, (0- overlap_distance + int(i*overlap_distance_factor), offset))
+        else:
+            screen.blit(img, (0-int(i*overlap_distance_factor), offset))
+        input(pygame.event.get())
+        pygame.display.update()
+        input(pygame.event.get())
+        te = milli_time()
+        
+        delay_if_neccessary(te-ts, wait_per_step)
 
-TIME_DILATION=150
+        
 
-#
-# Enumerate dirs and jpg files.
-# Assume the filenames already have randomised prefixes for now
-#
-dirlist=find_dirs(startdir)
-if len(dirlist) == 0:
-    imagedir = startdir
-else:
-    imagedir = dirlist[0]
-jpgfiles = find_files(imagedir, ".jpg")
-numfiles = len(jpgfiles)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Recursively loads images '
+        'from a directory, then displays them in a Slidshow.'
+    )
 
-#
-# Initialisation
-#
-THUMBS_DONE = 0
-pygame.init()
-pygame.mouse.set_visible(False)
-
-screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
-screen.fill(pygame.Color(0,0,0))
-(screenwidth,screenheight) = pygame.Surface.get_size(screen)
-
-# Now scaling img numbers with the display size
-#myfont = pygame.freetype.SysFont('Arial',240)
-#imagenumpos = (screenwidth-250,20)
-imagenumsiz = int(screenheight / 5)
-myfont = pygame.freetype.SysFont('Arial',imagenumsiz)
-imagenumpos = (screenwidth-int(imagenumsiz * 1.1),20)
-
-
-#
-# Display logo / menu
-#
-display_menu(logofile)
-#
-# Setup thumbnail surface
-#
-tsurf = screen.copy()
-tsurf.fill(pygame.Color('#00000000'))
-(thumbwidth, thumbheight, thumbx, thumby) = initialise_thumbs(numfiles)
-
-#
-# Event handling loop
-#
-while True:
-    event = pygame.event.wait()
-    if event.type == KEYDOWN:
-        if event.key == K_q:
-            break
-        elif event.key == K_t:
-            screen.blit(tsurf,tsurf.get_rect(),area=None, special_flags = 0)
-            display_thumbs(THUMBS_DONE)
-        elif event.key == K_m:
-            screen.fill(pygame.Color('#00000000'))
-            display_menu(logofile)
-        elif event.key == K_n:
-            showimages()
-            screen.fill(pygame.Color('#00000000'))
-            display_menu(logofile)
-        elif event.key == K_f:
-            thumbstamp = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
-            f = open(imagedir + "/00FL-" + thumbstamp + ".txt",'w')
-            f.write(imagedir + '\n' + thumbstamp + '\n\n')
-            imgcntr = 0
-            for jpgfile in jpgfiles:
-                f.write(format(imgcntr+1, '02d') + ' ' + os.path.basename(jpgfile) + '\n')
-                imgcntr += 1
-            f.close()
-        elif event.key == K_s:
-            screen.fill(pygame.Color('#00000000'))
-            imgcntr = 0
-            for jpgfile in jpgfiles:
-                displayimage(jpgfile,imgcntr,TIME_DILATION)
-                imgcntr += 1
-            pygame.time.wait(10 * TIME_DILATION)
-            THUMBS_DONE = 1
-            display_thumbs(THUMBS_DONE)
-        elif event.key == K_w:
-            thumbstamp = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
-            pygame.image.save(tsurf,imagedir + "/00TN-" + thumbstamp + ".png")
-#
-# Exit
-#
-pygame.quit()
-sys.exit(PGdebug)
-
+    parser.add_argument(
+        'path',
+        metavar='ImagePath',
+        type=str,
+        default='.',
+        nargs="?",
+        help='Path to a directory that contains images'
+    )
+    parser.add_argument(
+        '--waittime',
+        type=int,
+        dest='waittime',
+        action='store',
+        default=600,
+        help='Amount of time to wait before showing the next image.'
+    )
+    parser.add_argument(
+        '--title',
+        type=str,
+        dest='title',
+        action='store',
+        default="pgSlidShow | My Slideshow!",
+        help='Set the title for the display window.'
+    )
+    args = parser.parse_args()
+    waittime = args.waittime
+    title = args.title
+    main(startdir=args.path)
